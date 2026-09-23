@@ -1,5 +1,6 @@
 The tests verify that `curl-impersonate` has the same network signature as that of the supported browsers. They do not test curl's functionality itself.
 
+
 ## Running the tests
 
 The tests assume that you've built `curl-impersonate` docker image before (see [Building from source](https://github.com/lwthiker/curl-impersonate#building-from-source)).
