@@ -118,6 +118,12 @@ Configure and build:
     # Optionally remove all the build files
     rm -Rf build
 
+macOS release library archives include ``libcurl-impersonate.pc`` beside the
+merged ``libcurl-impersonate.a``. For static consumers, query its private link
+flags with ``pkg-config --static --libs libcurl-impersonate`` and link the
+archive explicitly. The file is generated for the flat release archive and is
+not produced by the ordinary local install target.
+
 FreeBSD
 ~~~~~~~
 

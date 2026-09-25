@@ -356,6 +356,28 @@ jobs:
               exit 1
             fi
           fi
+          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+            cmake \
+              "-DINPUT_PC=${{ github.workspace }}/build/deps/build/curl/libcurl.pc" \
+              "-DDEPENDENCY_PREFIX=${{ github.workspace }}/build/deps/install" \
+              "-DARCHIVE_DIR=$install_lib_dir" \
+              "-DARCHIVES=${lib_list// /;}" \
+              "-DOUTPUT_PC=$install_lib_dir/libcurl-impersonate.pc" \
+              -P "${{ github.workspace }}/cmake/PrepareMacOSPkgConfig.cmake"
+            pkgconfig_flags=($(PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$install_lib_dir" pkg-config --static --cflags --libs libcurl-impersonate))
+            for index in "${!pkgconfig_flags[@]}"; do
+              if [[ "${pkgconfig_flags[$index]}" == "-lcurl-impersonate" ]]; then
+                unset 'pkgconfig_flags[index]'
+              fi
+            done
+            printf 'pkg-config static consumer\n' > "$RUNNER_TEMP/pkgconfig-input.txt"
+            ${CC:-cc} "${{ github.workspace }}/tests/static-pkgconfig.c" \
+              "-I$install_dir/include" \
+              "-Wl,-force_load,$install_lib_dir/libcurl-impersonate.a" \
+              "${pkgconfig_flags[@]}" \
+              -o "$RUNNER_TEMP/static-pkgconfig"
+            test "$("$RUNNER_TEMP/static-pkgconfig" "file://$RUNNER_TEMP/pkgconfig-input.txt")" = "pkg-config static consumer"
+          fi
           rm -f libcares.a libz.a libzstd.a libbrotlidec.a libbrotlicommon.a libbrotlienc.a libnghttp2.a libnghttp3.a libngtcp2.a libngtcp2_crypto_boringssl.a libssl.a libcrypto.a libidn2.a
           rm -f libcurl-impersonate.orig.a
           ls -lah .
