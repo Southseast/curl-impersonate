@@ -116,6 +116,20 @@ Configure and build
     # Optionally remove all the build files
     rm -Rf build
 
+macOS release library archives include ``libcurl-impersonate.pc`` beside the
+merged ``libcurl-impersonate.a``. This metadata describes the flat release
+archive, not the ordinary local install tree.
+
+Install ``pkg-config`` to query the extracted release directory::
+
+    PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=/path/to/extracted/release \
+        pkg-config --static --cflags --libs libcurl-impersonate
+
+``--static`` includes private dependencies but does not force the linker to
+choose the static library. Replace ``-lcurl-impersonate`` with the archive path
+when linking statically. The macOS release workflow checks the packaged archive
+after extracting it into a directory containing spaces.
+
 BSD family (FreeBSD / OpenBSD)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
