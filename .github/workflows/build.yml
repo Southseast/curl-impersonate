@@ -339,6 +339,16 @@ jobs:
           if [[ -f libidn2.a ]]; then
             lib_list="$lib_list libidn2.a"
           fi
+          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+            autolink_source="$RUNNER_TEMP/libcurl-impersonate-autolink.s"
+            autolink_object="$install_lib_dir/libcurl-impersonate-autolink.o"
+            cmake \
+              "-DLIBRARY=$install_lib_dir/libcurl-impersonate.dylib" \
+              "-DOUTPUT=$autolink_source" \
+              -P "${{ github.workspace }}/cmake/PrepareMacOSAutolink.cmake"
+            ${CC:-cc} -c "$autolink_source" -o "$autolink_object"
+            lib_list="$lib_list $autolink_object"
+          fi
           if [[ "${{ runner.os }}" == "macOS" || "${{ matrix.platform }}" == "ios" ]]; then
             libtool -static -o libcurl-impersonate.a $lib_list
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
@@ -364,6 +374,27 @@ jobs:
             ar rcs libcurl-impersonate.a libcurl-impersonate.full.o
             rm -f libcurl-impersonate.full.o
           fi
+          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+            printf 'automatic static link consumer\n' > "$RUNNER_TEMP/autolink-input.txt"
+            ${CC:-cc} "${{ github.workspace }}/tests/static-autolink.c" \
+              "-I$install_dir/include" \
+              "-Wl,-force_load,$install_lib_dir/libcurl-impersonate.a" \
+              -lc++ \
+              -o "$RUNNER_TEMP/static-autolink"
+            if ! otool -l "$install_lib_dir/libcurl-impersonate.a" | grep -q LC_LINKER_OPTION; then
+              echo "Missing Mach-O automatic link options in static archive" >&2
+              exit 1
+            fi
+            if ! otool -L "$RUNNER_TEMP/static-autolink" | grep -q CoreFoundation.framework; then
+              echo "Static consumer is missing CoreFoundation dependency" >&2
+              exit 1
+            fi
+            if otool -L "$RUNNER_TEMP/static-autolink" | grep -q 'libcurl-impersonate.*dylib'; then
+              echo "Static consumer unexpectedly linked libcurl-impersonate.dylib" >&2
+              exit 1
+            fi
+            test "$("$RUNNER_TEMP/static-autolink" "file://$RUNNER_TEMP/autolink-input.txt")" = "automatic static link consumer"
+          fi
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             unresolved_cxx="$(nm -u libcurl-impersonate.a | grep -E '[[:space:]]U (_Z|__cxa|__gxx|_Unwind)' || true)"
             if [[ -n "$unresolved_cxx" ]]; then
@@ -372,7 +403,7 @@ jobs:
               exit 1
             fi
           fi
-          rm -f libcares.a libz.a libzstd.a libbrotlidec.a libbrotlicommon.a libbrotlienc.a libnghttp2.a libnghttp3.a libngtcp2.a libngtcp2_crypto_boringssl.a libssl.a libcrypto.a libidn2.a
+          rm -f libcurl-impersonate-autolink.o
           rm -f libcurl-impersonate.orig.a
           ls -lah .
           if [[ "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
